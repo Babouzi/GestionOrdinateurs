@@ -1,0 +1,78 @@
+@page "/ordinateurs"
+@attribute [Authorize(Roles = "Admin")]
+@using System.Net.Http.Headers
+@using GestionOrdinateurs.Shared
+@inject HttpClient Http
+@inject Blazored.SessionStorage.ISessionStorageService SessionStorage
+
+<PageTitle>Ordinateurs</PageTitle>
+
+<h1>Ordinateurs</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">@errorMessage</div>
+}
+else if (ordinateurs is null)
+{
+    <p>Chargement...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Prix</th>
+                <th>Devise</th>
+                <th>Vendu</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ordinateur in ordinateurs)
+            {
+                <tr>
+                    <td>@ordinateur.Nom</td>
+                    <td>@ordinateur.Prix.ToString("0.00")</td>
+                    <td>EUR</td>
+                    <td>@(ordinateur.Vendu ? "Oui" : "Non")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Ordinateur>? ordinateurs;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await SessionStorage.GetItemAsync<string>("jwtToken");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            errorMessage = "Connectez-vous pour consulter les ordinateurs.";
+            return;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/ordinateurs");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        try
+        {
+            using var response = await Http.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                errorMessage = $"Impossible de charger les ordinateurs (HTTP {(int)response.StatusCode}).";
+                return;
+            }
+
+            ordinateurs = await response.Content.ReadFromJsonAsync<List<Ordinateur>>()
+                ?? throw new System.Text.Json.JsonException("La réponse de l'API est vide.");
+        }
+        catch (HttpRequestException)
+        {
+            errorMessage = "La Gateway est indisponible.";
+        }
+    }
+}
