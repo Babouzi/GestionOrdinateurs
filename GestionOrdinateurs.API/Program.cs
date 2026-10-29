@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// 1. Configuration Swagger allégée (sans le Requirement qui plante en .NET 10)
+// 
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "GestionOrdinateurs", Version = "v1" });
@@ -33,7 +33,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// 2. Configuration JWT
+//  Configuration JWT
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
 {
@@ -72,7 +72,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowBlazorClient", policy =>
     {
-        policy.WithOrigins("http://localhost:5128")
+        policy.WithOrigins("http://localhost:5000")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -105,7 +105,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Middlewares de sécurité (L'ordre est absolu !)
+// Middlewares de sécurité 
 app.UseAuthentication();
 app.UseAuthorization();
 
