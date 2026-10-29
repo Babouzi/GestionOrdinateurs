@@ -42,8 +42,28 @@ public class JwtAuthenticationStateProvider : AuthenticationStateProvider
     {
         var payload = jwt.Split('.')[1];
         var jsonBytes = ParseBase64WithoutPadding(payload);
-        var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
-        return keyValuePairs!.Select(kvp => new Claim(kvp.Key, kvp.Value.ToString()!));
+        var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(jsonBytes);
+        if (keyValuePairs is null)
+        {
+            return [];
+        }
+
+        var claims = keyValuePairs
+            .Where(kvp => kvp.Key != "realm_access")
+            .Select(kvp => new Claim(kvp.Key, kvp.Value.ToString()))
+            .ToList();
+
+        if (keyValuePairs.TryGetValue("realm_access", out var realmAccess)
+            && realmAccess.ValueKind == JsonValueKind.Object
+            && realmAccess.TryGetProperty("roles", out var roles)
+            && roles.ValueKind == JsonValueKind.Array)
+        {
+            claims.AddRange(roles.EnumerateArray()
+                .Where(role => role.ValueKind == JsonValueKind.String)
+                .Select(role => new Claim(ClaimTypes.Role, role.GetString()!)));
+        }
+
+        return claims;
     }
 
     private byte[] ParseBase64WithoutPadding(string base64)

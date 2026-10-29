@@ -44,6 +44,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5157
+      Keycloak__TokenEndpoint: http://keycloak:8080/realms/GestionOrdinateurs/protocol/openid-connect/token
+      Keycloak__ClientId: gestion-ordinateurs-client
     depends_on:
       - postgres
       - keycloak
@@ -61,6 +63,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:5197
+      Keycloak__Authority: http://keycloak:8080/realms/GestionOrdinateurs
     depends_on:
       - postgres
     networks:

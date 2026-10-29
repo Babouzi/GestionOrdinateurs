@@ -4,11 +4,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configuration du HttpClientFactory 
-builder.Services.AddHttpClient("GestionOrdinateursClient", client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["ApiUrls:GestionOrdinateursApi"]!);
-});
+builder.Services.AddHttpClient();
 
 var app = builder.Build();
 

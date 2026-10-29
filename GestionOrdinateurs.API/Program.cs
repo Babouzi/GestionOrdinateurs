@@ -4,8 +4,8 @@ using GestionOrdinateurs.Shared;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -33,33 +33,69 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-//  Configuration JWT
-var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKey))
-{
-    throw new InvalidOperationException("La clé JWT (Jwt:Key) n'est pas configurée.");
-}
-var key = Encoding.UTF8.GetBytes(jwtKey);
-
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 }).AddJwtBearer(options =>
 {
+    options.Authority = builder.Configuration["Keycloak:Authority"]
+        ?? "http://localhost:8180/realms/GestionOrdinateurs";
     options.RequireHttpsMetadata = false;
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ValidateIssuer = false,
         ValidateAudience = false,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero,
+        ValidateIssuer = true,
+        ValidIssuers = new[]
+        {
+            "http://localhost:8180/realms/GestionOrdinateurs",
+            "http://keycloak:8080/realms/GestionOrdinateurs"
+        },
         RoleClaimType = ClaimTypes.Role
     };
+    options.MapInboundClaims = false;
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = context =>
+        {
+            var realmAccess = context.Principal?.FindFirst("realm_access")?.Value;
+            if (realmAccess is not null
+                && context.Principal?.Identity is ClaimsIdentity identity)
+            {
+                using var document = JsonDocument.Parse(realmAccess);
+                if (document.RootElement.TryGetProperty("roles", out var roles)
+                    && roles.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var role in roles.EnumerateArray())
+                    {
+                        if (role.ValueKind == JsonValueKind.String && role.GetString() is { } roleName)
+                        {
+                            identity.AddClaim(new Claim(ClaimTypes.Role, roleName));
+                        }
+                    }
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+    };
 });
+
+/*
+Ancienne validation avec clé symétrique locale, remplacée par l'autorité Keycloak :
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+        ValidateIssuer = false,
+        ValidateAudience = false
+    };
+});
+*/
 
 builder.Services.AddAuthorization();
 builder.Services.AddDbContext<ParcInformatiqueContext>();

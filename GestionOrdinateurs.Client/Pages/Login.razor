@@ -13,8 +13,12 @@
 <div class="row">
     <div class="col-md-4">
         <div class="form-group mb-3">
-            <label for="login">Login (ex. user1) :</label>
-            <input id="login" @bind="login" class="form-control" placeholder="Entrez votre identifiant" />
+            <label for="login">Nom d'utilisateur :</label>
+            <input id="login" @bind="username" class="form-control" autocomplete="username" placeholder="Entrez votre nom d'utilisateur" />
+        </div>
+        <div class="form-group mb-3">
+            <label for="password">Mot de passe :</label>
+            <input id="password" type="password" @bind="password" class="form-control" autocomplete="current-password" />
         </div>
 
         <button class="btn btn-primary mt-2" @onclick="SeConnecter">
@@ -29,38 +33,44 @@
 </div>
 
 @code {
-    private string login = string.Empty;
+    private string username = string.Empty;
+    private string password = string.Empty;
     private string errorMessage = string.Empty;
 
     private async Task SeConnecter()
     {
         errorMessage = string.Empty;
-        if (string.IsNullOrWhiteSpace(login))
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            errorMessage = "Saisissez un login.";
+            errorMessage = "Saisissez votre nom d'utilisateur et votre mot de passe.";
             return;
         }
 
         try
         {
-            using var response = await Http.PostAsJsonAsync("api/authentication/login", login.Trim());
+            using var response = await Http.PostAsJsonAsync("api/authentication/login", new
+            {
+                username = username.Trim(),
+                password
+            });
             if (!response.IsSuccessStatusCode)
             {
                 errorMessage = response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                    ? "Il n'existe pas."
+                    ? "Nom d'utilisateur ou mot de passe incorrect."
                     : $"Échec de la connexion (HTTP {(int)response.StatusCode}).";
                 return;
             }
 
             var result = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            if (result is null || string.IsNullOrWhiteSpace(result.Token))
+            var token = result?.AccessToken ?? result?.Token;
+            if (string.IsNullOrWhiteSpace(token))
             {
                 errorMessage = "La réponse de connexion ne contient pas de token.";
                 return;
             }
 
-            await SessionStorage.SetItemAsync("jwtToken", result.Token);
-            AuthProvider.NotifyUserAuthentication(result.Token);
+            await SessionStorage.SetItemAsync("jwtToken", token);
+            AuthProvider.NotifyUserAuthentication(token);
             Navigation.NavigateTo("/");
         }
         catch (HttpRequestException)
@@ -71,6 +81,9 @@
 
     private sealed class TokenResponse
     {
-        public string Token { get; set; } = string.Empty;
+        [System.Text.Json.Serialization.JsonPropertyName("access_token")]
+        public string? AccessToken { get; set; }
+
+        public string? Token { get; set; }
     }
 }
