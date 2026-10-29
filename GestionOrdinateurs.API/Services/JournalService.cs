@@ -7,7 +7,7 @@ public class JournalService
     public void Ecrire(string cheminFichier, string message)
     {
         var dossier = Path.GetDirectoryName(cheminFichier);
-        if (!Directory.Exists(dossier))
+        if (!string.IsNullOrEmpty(dossier) && !Directory.Exists(dossier))
         {
             Directory.CreateDirectory(dossier!);
         }
